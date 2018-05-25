@@ -4,22 +4,27 @@ import os
 from flask import Flask, request, session, g, redirect, url_for, abort, \
      render_template, flash
 
+from flask_uuid import FlaskUUID
+
+import uuid
+
 # конфигурация
-DATABASE = '/tmp/flaskr.db'
 DEBUG = True
 SECRET_KEY = 'development key'
-USERNAME = 'admin'
+EMAIL = 'admin'
 PASSWORD = 'default'
 
 # создаём наше маленькое приложение :)
 app = Flask(__name__)
 app.config.from_object(__name__)
+flask_uuid = FlaskUUID()
+flask_uuid.init_app(app)
 
 # Загружаем конфиг по умолчанию и переопределяем в конфигурации часть
 # значений через переменную окружения
 app.config.update(dict(
     DATABASE=os.path.join(app.root_path, 'flaskr.db'),
-    DEBUG=True,
+    DEBUG=False,
     SECRET_KEY='development key',
     USERNAME='admin',
     PASSWORD='default'
@@ -58,36 +63,90 @@ def close_db(error):
         g.sqlite_db.close()
 
 
-@app.route('/')
+@app.route('/authorized')
 def show_entries():
-    db = get_db()
-    cur = db.execute('select title, text from entries order by id desc')
-    entries = cur.fetchall()
-    return render_template('show_entries.html', entries=entries)
+    # db = get_db()
+    # cur = db.execute('select title, text from entries order by id desc')
+    # entries = cur.fetchall()
 
-@app.route('/add', methods=['POST'])
-def add_entry():
+
+
+    return render_template('show_entries.html')
+
+
+@app.route('/<invite>', methods=['GET', 'POST'])
+def register(invite):
+
+    db = get_db()
+    cur = db.execute('select * from users where invite=?', [invite])
+    res = cur.fetchall()
+    if len(res) > 0:
+        session['invite_link'] = invite
+
+        return render_template('register.html')
+    else:
+        abort(404)
+
+@app.route('/add-user', methods=['POST'])
+def add_user():
+    if len(request.form) > 0:
+
+        db = get_db()
+        cur = db.execute('select * from users where email=? and invite=?', [request.form['email'], session.get("invite_link")])
+        if len(cur.fetchall()) > 0:
+
+            db = get_db()
+            db.execute("update users SET password = ? where email=?", [request.form['password'], request.form['email']])
+            flash("Successfully registered!")
+            return redirect("/")
+        else:
+            abort(400)
+
+
+@app.route('/invite', methods=['POST'])
+def send_invite():
     if not session.get('logged_in'):
         abort(401)
-    db = get_db()
-    db.execute('insert into entries (title, text) values (?, ?)',
-                [request.form['title'], request.form['text']])
-    db.commit()
-    flash('New entry was successfully posted')
-    return redirect(url_for('show_entries'))
 
-@app.route('/login', methods=['GET', 'POST'])
+    invite_uuid = uuid.uuid4()
+
+    db = get_db()
+    db.execute(f"insert into users (email, invite, status) values ('{request.form['email']}', '{invite_uuid}', 0)")
+    db.commit()
+    flash('New invite was successfully posted')
+
+    print(invite_uuid)
+
+    return redirect(url_for('login'))
+
+@app.route('/', methods=['GET', 'POST'])
 def login():
     error = None
     if request.method == 'POST':
-        if request.form['username'] != app.config['USERNAME']:
-            error = 'Invalid username'
-        elif request.form['password'] != app.config['PASSWORD']:
-            error = 'Invalid password'
-        else:
+
+
+        if request.form['email'] == app.config['EMAIL'] and request.form['password'] == app.config['PASSWORD']:
             session['logged_in'] = True
             flash('You were logged in')
             return redirect(url_for('show_entries'))
+
+        db = get_db()
+        cur = db.execute('select * from users where email=?', [request.form['email']])
+        res = cur.fetchall()
+
+        if len(res) > 0:
+            if res[0]['password'] != request.form['password']:
+                error = 'Invalid password'
+            else:
+                session['logged_in'] = True
+                flash('You were logged in')
+                return redirect(url_for('show_entries'))
+
+
+        else:
+            error = 'Invalid email'
+
+
     return render_template('login.html', error=error)
 
 
