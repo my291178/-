@@ -5,15 +5,8 @@
       <dl>
         <dt>Email:
         <dd><input type=text size=30 name=email>
-        <dd><input type=submit value=Share>
+        <dd><input type=submit value=Invite>
       </dl>
     </form>
   {% endif %}
-  <ul class=entries>
-  {% for entry in entries %}
-    <li><h2>{{ entry.title }}</h2>{{ entry.text|safe }}
-  {% else %}
-    <li><em>Unbelievable.  No entries here so far</em>
-  {% endfor %}
-  </ul>
 {% endblock %}
