@@ -17,8 +17,8 @@ app.config.update(
     MAIL_SERVER='smtp.gmail.com',
     MAIL_PORT=465,
     MAIL_USE_SSL=True,
-    MAIL_USERNAME='nastya120982@gmail.com',
-    MAIL_PASSWORD='4ever2gever'
+    MAIL_USERNAME='', #TODO add gmail account
+    MAIL_PASSWORD=''
 )
 
 mail = Mail(app)
