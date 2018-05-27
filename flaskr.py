@@ -8,15 +8,35 @@ from flask_uuid import FlaskUUID
 
 import uuid
 
+from flask_mail import Mail
+from flask_mail import Message
+
+
+
+#msg.html = "<b>testing</b>"
+
 # конфигурация
 DEBUG = True
 SECRET_KEY = 'development key'
 EMAIL = 'admin'
 PASSWORD = 'default'
+HOME_URL = 'http://localhost:5000/'
+
 
 # создаём наше маленькое приложение :)
 app = Flask(__name__)
+app.config.update(
+	DEBUG=True,
+	#EMAIL SETTINGS
+	MAIL_SERVER='smtp.gmail.com',
+	MAIL_PORT=465,
+	MAIL_USE_SSL=True,
+	MAIL_USERNAME = 'nastya120982@gmail.com',
+	MAIL_PASSWORD = '4ever2gever'
+)
+
 app.config.from_object(__name__)
+mail = Mail(app)
 flask_uuid = FlaskUUID()
 flask_uuid.init_app(app)
 
@@ -44,9 +64,14 @@ def init_db():
             db.cursor().executescript(f.read())
         db.commit()
 
+def send_email(recipients, body):
 
-if __name__ == '__main__':
-    app.run()
+    msg = Message("You've been invited",
+                  sender="from@example.com",
+                  recipients=recipients)
+    msg.body = body
+    mail.send(msg)
+
 
 def get_db():
     """Если ещё нет соединения с базой данных, открыть новое - для
@@ -74,13 +99,19 @@ def show_entries():
     return render_template('show_entries.html')
 
 
+
 @app.route('/<invite>', methods=['GET', 'POST'])
 def register(invite):
 
     db = get_db()
-    cur = db.execute('select * from users where invite=?', [invite])
+    cur = db.execute('select * from users where invite=?',[invite])
     res = cur.fetchall()
     if len(res) > 0:
+
+        if res[0]['status'] == 1:
+            return "This link was used by another user"
+
+
         session['invite_link'] = invite
 
         return render_template('register.html')
@@ -96,7 +127,8 @@ def add_user():
         if len(cur.fetchall()) > 0:
 
             db = get_db()
-            db.execute("update users SET password = ? where email=?", [request.form['password'], request.form['email']])
+            db.execute("update users set password=?, status=1 where email=?", [request.form['password'], request.form['email']])
+            db.commit()
             flash("Successfully registered!")
             return redirect("/")
         else:
@@ -108,14 +140,27 @@ def send_invite():
     if not session.get('logged_in'):
         abort(401)
 
-    invite_uuid = uuid.uuid4()
+
+
+
+    while True:
+
+        invite_uuid = uuid.uuid4()
+
+        db = get_db()
+        cur = db.execute("select * from users where invite=?", [str(invite_uuid)])
+
+        if len(cur.fetchall()) == 0:
+            break
 
     db = get_db()
-    db.execute(f"insert into users (email, invite, status) values ('{request.form['email']}', '{invite_uuid}', 0)")
+    db.execute("insert into users (email, invite, status) values (? , ?, 0)", [request.form['email'], str(invite_uuid)])
     db.commit()
     flash('New invite was successfully posted')
 
     print(invite_uuid)
+
+    send_email([request.form['email']], f"{app.config['HOME_URL']}{invite_uuid}")
 
     return redirect(url_for('login'))
 
@@ -156,3 +201,5 @@ def logout():
     flash('You were logged out')
     return redirect(url_for('show_entries'))
 
+if __name__ == '__main__':
+    app.run()
