@@ -17,8 +17,8 @@ app.config.update(
     MAIL_SERVER='smtp.gmail.com',
     MAIL_PORT=465,
     MAIL_USE_SSL=True,
-    MAIL_USERNAME='nastya120982@gmail.com',
-    MAIL_PASSWORD='4ever2gever'
+    MAIL_USERNAME='hhiconversion@gmail.com',
+    MAIL_PASSWORD='HiConversion2018'
 )
 
 mail = Mail(app)
@@ -48,14 +48,6 @@ def init_db():
         with app.open_resource('schema.sql', mode='r') as f:
             db.cursor().executescript(f.read())
         db.commit()
-
-
-def send_email(recipients, body):
-    msg = Message("You've been invited",
-                  sender="from@example.com",
-                  recipients=recipients)
-    msg.body = body
-    mail.send(msg)
 
 
 def get_db():
@@ -111,16 +103,33 @@ def add_user():
             abort(400)
 
 
+def send_email(recipients, body):
+    msg = Message("You've been invited",
+                  sender="from@example.com",
+                  recipients=recipients)
+    msg.body = body
+    mail.send(msg)
+
+
 @app.route('/invite', methods=['POST'])
 def send_invite():
     if not session.get('logged_in'):
         abort(401)
+
+    db = get_db()
+    cur = db.execute('select * from users where email=?',
+                     [request.form['email']])
+
+    if len(cur.fetchall()) > 0:
+        flash("User with this email is already registered")
+        return redirect(url_for("show_entries"))
 
     while True:
 
         invite_uuid = uuid.uuid4()
 
         db = get_db()
+        # берет из базы
         cur = db.execute("select * from users where invite=?", [str(invite_uuid)])
 
         if len(cur.fetchall()) == 0:
