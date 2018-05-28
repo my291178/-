@@ -20,7 +20,7 @@ app.config.update(
     MAIL_USERNAME='hhiconversion@gmail.com',
     MAIL_PASSWORD='HiConversion2018'
 )
-
+# здесь необходимо вставить smtp порт вашей почты, саму почту и пароль
 mail = Mail(app)
 flask_uuid = FlaskUUID()
 flask_uuid.init_app(app)
